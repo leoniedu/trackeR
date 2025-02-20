@@ -12,7 +12,10 @@
 #' @param distanceunit Character string indicating the measurement
 #'     unit of the distance in the container file to be converted into
 #'     meters. See Details.
+#' @param sport Character string indicating the sport type. If NULL (default),
+#'     attempts to identify the sport from the data or filename.
 #' @param ... Currently not used.
+#'
 #' @details
 #'
 #' Available options for \code{speedunit} currently are
@@ -52,6 +55,7 @@ readTCX <- function(file,
                     timezone = "",
                     speedunit = "m_per_s",
                     distanceunit = "m",
+                    sport = NULL,
                     ...) {
 
     doc <- read_xml(file)
@@ -70,10 +74,12 @@ readTCX <- function(file,
     extensions_ns <- na.omit(sapply(extensions_ns, function(e) names(which(ns == e)[1])))
 
     ## Guess sport from data
-    sport <- guess_sport(xml_attr(xml_find_first(doc, paste0("//", activity_ns, ":", "Activity")), "Sport"))
-    ## If not successful, try filename
-    if (is.na(sport)) {
-        sport <- guess_sport(basename(file))
+    if (is.null(sport)) {
+        sport <- guess_sport(xml_attr(xml_find_first(doc, paste0("//", activity_ns, ":", "Activity")), "Sport"))
+        ## If not successful, try filename
+        if (is.na(sport)) {
+            sport <- guess_sport(basename(file))
+        }
     }
 
     ## Tp
@@ -156,6 +162,9 @@ readTCX <- function(file,
             if (sport == "swimming" | is.na(sport)) {
                 observations[is_cadence] <- NULL
             }
+            if (sport == "cycling") {
+                names(observations)[is_cadence] <- "cadence_cycling"
+            }
         }
     }
 
@@ -197,6 +206,7 @@ readGPX <- function(file,
                     timezone = "",
                     speedunit = "km_per_h",
                     distanceunit = "km",
+                    sport = NULL,
                     ...) {
 
     ## https://developers.strava.com/docs/uploads/ assuming that
@@ -223,13 +233,15 @@ readGPX <- function(file,
     extensions_ns <- na.omit(sapply(extensions_ns, function(e) names(which(ns == e)[1])))
 
     ## Guess sport from data
-    sport <- guess_sport(xml_text(xml_find_first(doc, paste0("//", activity_ns, ":", "name"))))
-    if (is.na(sport)) {
-        sport <- guess_sport(xml_text(xml_find_first(doc, paste0("//", activity_ns, ":", "type"))))
-    }
-    ## If not successful, try filename
-    if (is.na(sport)) {
-        sport <- guess_sport(basename(file))
+    if (is.null(sport)) {
+        sport <- guess_sport(xml_text(xml_find_first(doc, paste0("//", activity_ns, ":", "name"))))
+        if (is.na(sport)) {
+            sport <- guess_sport(xml_text(xml_find_first(doc, paste0("//", activity_ns, ":", "type"))))
+        }
+        ## If not successful, try filename
+        if (is.na(sport)) {
+            sport <- guess_sport(basename(file))
+        }
     }
 
     ## Trackpoint
@@ -354,9 +366,12 @@ readDB3 <- function(file,
                     table = "gps_data",
                     speedunit = "km_per_h",
                     distanceunit = "km",
+                    sport = NULL,
                     ...) {
 
-    sport <- guess_sport(basename(file))
+    if (is.null(sport)) {
+        sport <- guess_sport(basename(file))
+    }
 
     db <- RSQLite::dbConnect(RSQLite::SQLite(), file)
     mydf <- RSQLite::dbReadTable(conn = db, name = table)
@@ -380,18 +395,17 @@ readDB3 <- function(file,
     ## coerce time into POSIXct
     newdat$time <- as.POSIXct(newdat$time*24*60*60, origin = "1899-12-30", tz = timezone)
 
-    is_cadence <- grepl("cadence", names(observations))
-
+    is_cadence <- grepl("cadence", names(newdat))
     if (any(is_cadence)) {
         if (is.na(sport)) {
-            observations[is_cadence] <- NULL
+            newdat[is_cadence] <- NULL
         }
         else {
             if (sport == "running") {
-                names(observations)[is_cadence] <- "cadence_running"
+                names(newdat)[is_cadence] <- "cadence_running"
             }
             if (sport == "swimming" | is.na(sport)) {
-                observations[is_cadence] <- NULL
+                newdat[is_cadence] <- NULL
             }
         }
     }
@@ -420,8 +434,8 @@ readDB3 <- function(file,
     if (any(names(newdat) != allnames$human_names))
         newdat <- newdat[, allnames$human_names]
 
-    attr(newdata, "sport") <- sport
-    attr(observations, "file") <- file
+    attr(newdat, "sport") <- sport
+    attr(newdat, "file") <- file
 
     return(newdat)
 }
@@ -435,6 +449,7 @@ readJSON <- function(file,
                      timezone = "",
                      speedunit = "km_per_h",
                      distanceunit = "km",
+                     sport = NULL,
                      ...) {
     ## get all data
     jslist <- jsonlite::fromJSON(file)$RIDE
@@ -446,10 +461,12 @@ readJSON <- function(file,
                                  format = "%Y/%m/%dT%H:%M:%S"), tz = timezone)
 
     ## Guess sport from data
-    sport <- guess_sport(jslist$TAGS$Sport)
-    ## If not successful, try filename
-    if (is.na(sport)) {
-        sport <- guess_sport(basename(file))
+    if (is.null(sport)) {
+        sport <- guess_sport(jslist$TAGS$Sport)
+        ## If not successful, try filename
+        if (is.na(sport)) {
+            sport <- guess_sport(basename(file))
+        }
     }
 
     ## tracking data
@@ -524,7 +541,7 @@ readJSON <- function(file,
 #'     versions (gz, bz2, xz, zip) of tcx, gpx, and json files are
 #'     directly supported.
 #' @param type The type of the GPS container file. Supported so far
-#'     are \code{tcx}, \code{db3}, and \code{json}.
+#'     are \code{tcx}, \code{gpx}, \code{db3}, and \code{json}.
 #' @param table The name of the table in the database if \code{type}
 #'     is set to \code{db3}, ignored otherwise.
 #' @param from_distances Logical. Should the speeds be calculated from
@@ -562,10 +579,8 @@ readJSON <- function(file,
 #' \code{read_container} try to identify the sport from the data in
 #' the container file. If that fails, then an attempt is made to guess
 #' the sport from keywords in the filename. If identification is not
-#' possible then an error is returned from
-#' \code{\link{trackeRdata}}. To avoid that error, and if the sport is
-#' known, append an appropriate keyword to the filename (e.g. 'ride',
-#' 'swim', 'run'). This should fix the error.
+#' possible then the \code{file} attribute of the returned object has
+#' value \code{NA}.
 #'
 #' @return An object of class \code{\link{trackeRdata}}.
 #' @seealso \code{\link{trackeRdata}}, \code{\link{readTCX}}, \code{\link{readDB3}}, \code{\link{readJSON}}
@@ -579,8 +594,8 @@ read_container <- function(file,
                            table = "gps_data",
                            timezone = "",
                            session_threshold = 2,
-                           correct_distances = FALSE,
                            smooth_elevation_gain = TRUE,
+                           correct_distances = FALSE,
                            country = NULL,
                            mask = TRUE,
                            from_distances = NULL,
