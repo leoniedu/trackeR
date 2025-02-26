@@ -6,12 +6,27 @@
 \alias{readGPX}
 \alias{readDB3}
 \alias{readJSON}
-\title{Read a training file in tcx, gpx, db3 or Golden Cheetah's JSON
+\alias{readFIT}
+\title{Read a training file in tcx, gpx, db3, fit or Golden Cheetah's JSON
 format}
 \usage{
-readTCX(file, timezone = "", speedunit = "m_per_s", distanceunit = "m", ...)
+readTCX(
+  file,
+  timezone = "",
+  speedunit = "m_per_s",
+  distanceunit = "m",
+  sport = NULL,
+  ...
+)
 
-readGPX(file, timezone = "", speedunit = "km_per_h", distanceunit = "km", ...)
+readGPX(
+  file,
+  timezone = "",
+  speedunit = "km_per_h",
+  distanceunit = "km",
+  sport = NULL,
+  ...
+)
 
 readDB3(
   file,
@@ -19,10 +34,27 @@ readDB3(
   table = "gps_data",
   speedunit = "km_per_h",
   distanceunit = "km",
+  sport = NULL,
   ...
 )
 
-readJSON(file, timezone = "", speedunit = "km_per_h", distanceunit = "km", ...)
+readJSON(
+  file,
+  timezone = "",
+  speedunit = "km_per_h",
+  distanceunit = "km",
+  sport = NULL,
+  ...
+)
+
+readFIT(
+  file,
+  timezone = "",
+  speedunit = "m_per_s",
+  distanceunit = "m",
+  sport = NULL,
+  ...
+)
 }
 \arguments{
 \item{file}{The path to a tcx, gpx, json or db3 file. Compressed
@@ -40,13 +72,13 @@ per second. See Details.}
 unit of the distance in the container file to be converted into
 meters. See Details.}
 
-\item{...}{Currently not used.}
+\item{sport}{Character string indicating the sport type. If NULL (default),
+attempts to identify the sport from the data or filename.}
 
-\item{table}{Character string indicating the name of the table with
-the GPS data in the db3 container file.}
+\item{...}{Currently not used.}
 }
 \description{
-Read a training file in tcx, gpx, db3 or Golden Cheetah's JSON
+Read a training file in tcx, gpx, db3, fit or Golden Cheetah's JSON
 format
 }
 \details{

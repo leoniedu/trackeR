@@ -7,12 +7,12 @@
 \usage{
 read_container(
   file,
-  type = c("tcx", "gpx", "db3", "json"),
+  type = c("tcx", "gpx", "db3", "json", "fit"),
   table = "gps_data",
   timezone = "",
   session_threshold = 2,
-  correct_distances = FALSE,
   smooth_elevation_gain = TRUE,
+  correct_distances = FALSE,
   country = NULL,
   mask = TRUE,
   from_distances = NULL,
@@ -27,12 +27,12 @@ read_container(
 
 readContainer(
   file,
-  type = c("tcx", "gpx", "db3", "json"),
+  type = c("tcx", "gpx", "db3", "json", "fit"),
   table = "gps_data",
   timezone = "",
   session_threshold = 2,
-  correct_distances = FALSE,
   smooth_elevation_gain = TRUE,
+  correct_distances = FALSE,
   country = NULL,
   mask = TRUE,
   from_distances = NULL,
@@ -51,7 +51,7 @@ versions (gz, bz2, xz, zip) of tcx, gpx, and json files are
 directly supported.}
 
 \item{type}{The type of the GPS container file. Supported so far
-are \code{tcx}, \code{db3}, and \code{json}.}
+are \code{tcx}, \code{gpx}, \code{db3}, and \code{json}.}
 
 \item{table}{The name of the table in the database if \code{type}
 is set to \code{db3}, ignored otherwise.}
@@ -63,12 +63,12 @@ is set to \code{db3}, ignored otherwise.}
 difference between consecutive timestamps above which they are
 considered to belong to different training sessions.}
 
-\item{correct_distances}{Logical. Should the distances be corrected
-for elevation? Default is \code{FALSE}.}
-
 \item{smooth_elevation_gain}{Logical. Should the elevation gain be
 smoothed before computing elevation gain? Default
 is \code{TRUE}.}
+
+\item{correct_distances}{Logical. Should the distances be corrected
+for elevation? Default is \code{FALSE}.}
 
 \item{country}{ISO3 country code for downloading altitude data. If
 \code{NULL}, country is derived from longitude and latitude}
@@ -128,10 +128,8 @@ Available options for \code{speedunit} currently are
 \code{read_container} try to identify the sport from the data in
 the container file. If that fails, then an attempt is made to guess
 the sport from keywords in the filename. If identification is not
-possible then an error is returned from
-\code{\link{trackeRdata}}. To avoid that error, and if the sport is
-known, append an appropriate keyword to the filename (e.g. 'ride',
-'swim', 'run'). This should fix the error.
+possible then the \code{file} attribute of the returned object has
+value \code{NA}.
 }
 \examples{
 filepath <- system.file("extdata/tcx", "2013-06-08-090442.TCX.gz", package = "trackeR")

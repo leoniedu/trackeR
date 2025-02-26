@@ -17,8 +17,8 @@ read_directory(
   mask = TRUE,
   from_distances = NULL,
   speedunit = list(tcx = "m_per_s", gpx = "km_per_h", db3 = "km_per_h", json =
-    "km_per_h"),
-  distanceunit = list(tcx = "m", gpx = "km", db3 = "km", json = "km"),
+    "km_per_h", fit = "m_per_s"),
+  distanceunit = list(tcx = "m", gpx = "km", db3 = "km", json = "km", fit = "m"),
   sport = NULL,
   lgap = 30,
   lskip = 5,
@@ -40,8 +40,8 @@ readDirectory(
   mask = TRUE,
   from_distances = NULL,
   speedunit = list(tcx = "m_per_s", gpx = "km_per_h", db3 = "km_per_h", json =
-    "km_per_h"),
-  distanceunit = list(tcx = "m", gpx = "km", db3 = "km", json = "km"),
+    "km_per_h", fit = "m_per_s"),
+  distanceunit = list(tcx = "m", gpx = "km", db3 = "km", json = "km", fit = "m"),
   sport = NULL,
   lgap = 30,
   lskip = 5,
