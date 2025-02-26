@@ -54,3 +54,5 @@ vignettes/TourDetrackeR_files/
 
 tests/
 ^CRAN-SUBMISSION$
+^.*\.Rproj$
+^\.Rproj\.user$

@@ -13,6 +13,17 @@ generate_variable_names <- function() {
                      "cadence_cycling",
                      "power",
                      "temperature")
+    fit_names <- c("timestamp",
+                   "position_lat",
+                   "position_long",
+                   "altitude",
+                   "distance",
+                   "heart_rate",
+                   "speed",
+                   "rcadence", ## dummy for now; fit seems not to distinguish between run and cycling cadence
+                   "cadence",
+                   "power",
+                   "temperature")
 
     tcx_names <- c("Time",
                    "LatitudeDegrees",
@@ -65,7 +76,8 @@ generate_variable_names <- function() {
          gpx_names = gpx_names,
          tcx2_names = tcx_names,
          db3_names = db3_names,
-         json_names = json_names)
+         json_names = json_names,
+         fit_names = fit_names)
 }
 
 

@@ -27,7 +27,8 @@ Imports:
     leaflet,
     ggmap,
     gridExtra,
-    gtable
+    gtable,
+    FITfileR
 Suggests:
     spelling,
     testthat,

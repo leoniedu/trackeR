@@ -1,4 +1,4 @@
-#' Read a training file in tcx, gpx, db3 or Golden Cheetah's JSON
+#' Read a training file in tcx, gpx, db3, fit or Golden Cheetah's JSON
 #' format
 #'
 #' @param file The path to a tcx, gpx, json or db3 file. Compressed
@@ -58,7 +58,7 @@ readTCX <- function(file,
                     sport = NULL,
                     ...) {
 
-    doc <- read_xml(file)
+    doc <- safe_read_xml(file)
     ns <- xml_ns(doc)
 
     children_names <- function(x, xpath, ns) {
@@ -214,7 +214,7 @@ readGPX <- function(file,
     ## named as cadence. If sport is unknown then we assume that both
     ## cadence_running and cadence_cycling are NA
 
-    doc <- read_xml(file)
+    doc <- safe_read_xml(file)
     ns <- xml_ns(doc)
 
     children_names <- function(x,
@@ -355,9 +355,6 @@ readGPX <- function(file,
     return(observations)
 
 }
-
-#' @param table Character string indicating the name of the table with
-#'     the GPS data in the db3 container file.
 
 #' @export
 #' @rdname readX
@@ -590,7 +587,7 @@ readJSON <- function(file,
 #' run <- read_container(filepath, type = "tcx", timezone = "GMT")
 #' @export
 read_container <- function(file,
-                           type = c("tcx", "gpx", "db3", "json"),
+                           type = c("tcx", "gpx", "db3", "json", "fit"),
                            table = "gps_data",
                            timezone = "",
                            session_threshold = 2,
@@ -607,7 +604,7 @@ read_container <- function(file,
                            m = 11,
                            silent = FALSE) {
     ## prepare args
-    type <- match.arg(tolower(type), choices = c("tcx", "gpx", "db3", "json"))
+    type <- match.arg(tolower(type), choices = c("tcx", "gpx", "db3", "json", "fit"))
     if (is.null(from_distances)){
         from_distances <- if (type == "db3") FALSE else TRUE
     }
@@ -616,26 +613,30 @@ read_container <- function(file,
                             "tcx" = "m_per_s",
                             "gpx" = "km_per_h",
                             "db3" = "km_per_h",
-                            "json" = "km_per_h")
+                            "json" = "km_per_h",
+                            "fit" = "m_per_s")
     }
     if (is.null(distanceunit)) {
         distanceunit <- switch(type,
                                "tcx" = "m",
                                "gpx" = "km",
                                "db3" = "km",
-                               "json" = "km")
+                               "json" = "km",
+                               "fit" = "m")
     }
 
     ## read gps data
     dat <- switch(type,
                   "tcx" = readTCX(file = file, timezone = timezone, speedunit = speedunit,
-                                  distanceunit = distanceunit),
+                                  distanceunit = distanceunit, sport = sport),
                   "gpx" = readGPX(file = file, timezone = timezone, speedunit = speedunit,
-                                  distanceunit = distanceunit),
+                                  distanceunit = distanceunit, sport = sport),
                   "db3" = readDB3(file = file, table = table, timezone = timezone,
                                   speedunit = speedunit, distanceunit = distanceunit),
                   "json" = readJSON(file = file, timezone = timezone, speedunit = speedunit,
-                      distanceunit = distanceunit)
+                      distanceunit = distanceunit),
+                  "fit" = readFIT(file = file, timezone = timezone, speedunit = speedunit,
+                      distanceunit = distanceunit, sport = sport)
                   )
 
     ## make trackeRdata object (with all necessary data handling)
@@ -720,8 +721,8 @@ read_directory <- function(directory,
                           country = NULL,
                           mask = TRUE,
                           from_distances = NULL,
-                          speedunit = list(tcx = "m_per_s", gpx = "km_per_h", db3 = "km_per_h", json = "km_per_h"),
-                          distanceunit = list(tcx = "m", gpx = "km", db3 = "km", json = "km"),
+                          speedunit = list(tcx = "m_per_s", gpx = "km_per_h", db3 = "km_per_h", json = "km_per_h", fit = "m_per_s"),
+                          distanceunit = list(tcx = "m", gpx = "km", db3 = "km", json = "km", fit = "m"),
                           sport = NULL,
                           lgap = 30,
                           lskip = 5,
@@ -738,19 +739,21 @@ read_directory <- function(directory,
                            no.. = TRUE)
     jsonFiles <- list.files(directory, pattern = "json", ignore.case = TRUE, full.names = TRUE,
                             no.. = TRUE)
+    fitFiles <- list.files(directory, pattern = "fit", ignore.case = TRUE, full.names = TRUE,
+                           no.. = TRUE)
     ltcx <- length(tcxFiles)
     lgpx <- length(gpxFiles)
     ldb3 <- length(db3Files)
     ljson <- length(jsonFiles)
-    if ((ltcx == 0) & (ldb3 == 0) & (ljson == 0) & (lgpx == 0)) {
+    lfit <- length(fitFiles)
+    if ((ltcx == 0) & (ldb3 == 0) & (ljson == 0) & (lgpx == 0) & (lfit == 0)) {
         stop("The supplied directory contains no files with the supported formats.")
     }
-    lall <- ltcx + lgpx + ldb3 + ljson
-    allFiles <- c(tcxFiles, gpxFiles, db3Files, jsonFiles)
-    fileType <- c(rep("tcx", ltcx), rep("gpx", lgpx), rep("db3", ldb3), rep("json", ljson))
+    lall <- ltcx + lgpx + ldb3 + ljson + lfit
+    allFiles <- c(tcxFiles, gpxFiles, db3Files, jsonFiles, fitFiles)
+    fileType <- c(rep("tcx", ltcx), rep("gpx", lgpx), rep("db3", ldb3), rep("json", ljson), rep("fit", lfit))
 
     allData <- list()
-
     if (aggregate) {
         read_fun <- function(j) {
             currentType <- fileType[j]
@@ -761,7 +764,7 @@ read_directory <- function(directory,
                         args = list(file = allFiles[j],
                                     timezone = timezone,
                                     speedunit = speedunit[[currentType]],
-                                    distanceunit = distanceunit[[currentType]])))
+                                    distanceunit = distanceunit[[currentType]], sport=sport)))
         }
 
         foreach_object <- eval(as.call(c(list(quote(foreach::foreach), j = seq.int(lall)))))
@@ -777,9 +780,8 @@ read_directory <- function(directory,
             cat("Cleaning up...")
         }
         sports <- sapply(allData, attr, which = "sport")
-        sport_to_use <- na.omit(sports)[1]
         if (length(unique(sports)) > 1) {
-            warning(directory, "has files from multiple sports and aggregate = TRUE. Assumming that all files are ", sport_to_use)
+            warning(directory, "has files from multiple sports and aggregate = TRUE. Assumming that all files are ", unique(sports)[1])
         }
 
         allData <- do.call("rbind", allData[!sapply(allData, inherits, what = "try-error")])
@@ -852,4 +854,137 @@ read_directory <- function(directory,
         attr(allData, "file") <- rep(NA, length(allData))
     }
     allData
+}
+
+#' @export
+#' @rdname readX
+readFIT <- function(file,
+                    timezone = "",
+                    speedunit = "m_per_s",
+                    distanceunit = "m",
+                    sport = NULL,
+                    ...) {
+
+    ## Read FIT file using FITfileR
+    fit_data <- FITfileR::readFitFile(file)
+    records <- FITfileR::records(fit_data)
+
+    ## Extract relevant variables and rename to match trackeR conventions
+    available_cols <- names(records)
+    observations <- data.frame(
+        time = if ("timestamp" %in% available_cols) records$timestamp else NA,
+        latitude = if ("position_lat" %in% available_cols) records$position_lat else NA,
+        longitude = if ("position_long" %in% available_cols) records$position_long else NA,
+        altitude = if ("altitude" %in% available_cols) records$altitude else NA,
+        distance = if ("distance" %in% available_cols) records$distance else NA,
+        heart_rate = if ("heart_rate" %in% available_cols) records$heart_rate else NA,
+        speed = if ("speed" %in% available_cols) records$speed else NA,
+        cadence = if ("cadence" %in% available_cols) records$cadence else NA,
+        power = if ("power" %in% available_cols) records$power else NA,
+        temperature = if ("temperature" %in% available_cols) records$temperature else NA
+    )
+
+    ## Convert timestamps to POSIXct
+    observations$time <- as.POSIXct(observations$time, tz = timezone)
+
+    ## Guess sport from data if not provided
+    if (is.null(sport)) {
+        session_data <- FITfileR::getMessagesByType(fit_data, message_type = "session")
+        if (length(session_data) > 0 && "sport" %in% names(session_data)) {
+            # Get unique sports from all sessions
+            unique_sports <- unique(session_data$sport)
+            if (length(unique_sports) == 1) {
+                sport <- guess_sport(unique_sports)
+            } else {
+                # If multiple different sports, use the most frequent one
+                sport_counts <- sort(table(session_data$sport), decreasing = TRUE)
+                warning("Multiple sports found in file: ",
+                       paste(names(sport_counts), " (", sport_counts, " sessions)",
+                             collapse = ", "),
+                       ". Using most frequent: ", names(sport_counts)[1])
+                sport <- guess_sport(names(sport_counts)[1])
+            }
+        }
+        ## If not successful, try filename
+        if (is.na(sport)) {
+            sport <- guess_sport(basename(file))
+        }
+    }
+
+    ## Handle cadence based on sport type
+    if (!is.null(observations$cadence)) {
+        if (is.na(sport)) {
+            observations$cadence <- NULL
+        }
+        else {
+            if (sport == "running") {
+                names(observations)[names(observations) == "cadence"] <- "cadence_running"
+            }
+            if (sport == "swimming") {
+                observations$cadence <- NULL
+            }
+            if (sport == "cycling") {
+                names(observations)[names(observations) == "cadence"] <- "cadence_cycling"
+            }
+        }
+    }
+
+    ## convert speed from speedunit to m/s if needed
+    if (speedunit != "m_per_s") {
+        speedConversion <- match.fun(paste(speedunit, "m_per_s", sep = "2"))
+        observations$speed <- speedConversion(observations$speed)
+    }
+
+    ## convert distance from distanceunit to m if needed
+    if (distanceunit != "m") {
+        distanceConversion <- match.fun(paste(distanceunit, "m", sep = "2"))
+        observations$distance <- distanceConversion(observations$distance)
+    }
+
+    ## Add missing variables to match trackeRdata format
+    allnames <- generate_variable_names()
+    missingVars <- allnames$human_names[match(allnames$human_names, names(observations), nomatch = 0) == 0]
+    if (nrow(observations) > 0) {
+        for (nn in missingVars) {
+            observations[[nn]] <- NA
+        }
+    }
+
+    ## Ensure correct variable order
+    observations <- observations[, allnames$human_names]
+
+    ## Set attributes
+    attr(observations, "sport") <- sport
+    attr(observations, "file") <- file
+
+    return(observations)
+}
+
+#' Read XML file safely handling leading whitespace and compression
+#' @param file Path to XML file (can be compressed)
+#' @return xml_document object
+#' @noRd
+safe_read_xml <- function(file) {
+    # Read file with gzfile (handles both compressed and uncompressed)
+    con <- gzfile(file, "r")
+    on.exit(close(con))
+    
+    # Read content and find first XML content
+    lines <- readLines(con, warn = FALSE)
+    xml_start <- grep("^\\s*<\\?xml|^\\s*<[a-zA-Z]", lines)[1]
+    
+    if (is.na(xml_start)) {
+        stop("No valid XML content found in file")
+    }
+    
+    # Create temporary file with clean content
+    temp_file <- tempfile()
+    on.exit(unlink(temp_file), add = TRUE)
+    
+    # Remove leading whitespace from first XML line and write all lines
+    lines[xml_start] <- sub("^\\s+", "", lines[xml_start])
+    writeLines(lines[xml_start:length(lines)], temp_file)
+    
+    # Read the cleaned file
+    read_xml(temp_file)
 }
