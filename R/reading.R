@@ -866,27 +866,25 @@ readFIT <- function(file,
                     ...) {
 
     ## Read FIT file using FITfileR
+        ## Read FIT file using FITfileR
     fit_data <- FITfileR::readFitFile(file)
     records <- FITfileR::records(fit_data)
 
-    ## Extract relevant variables and rename to match trackeR conventions
-    available_cols <- names(records)
-    observations <- data.frame(
-        time = if ("timestamp" %in% available_cols) records$timestamp else NA,
-        latitude = if ("position_lat" %in% available_cols) records$position_lat else NA,
-        longitude = if ("position_long" %in% available_cols) records$position_long else NA,
-        altitude = if ("altitude" %in% available_cols) records$altitude else NA,
-        distance = if ("distance" %in% available_cols) records$distance else NA,
-        heart_rate = if ("heart_rate" %in% available_cols) records$heart_rate else NA,
-        speed = if ("speed" %in% available_cols) records$speed else NA,
-        cadence = if ("cadence" %in% available_cols) records$cadence else NA,
-        power = if ("power" %in% available_cols) records$power else NA,
-        temperature = if ("temperature" %in% available_cols) records$temperature else NA
-    )
+    ## Get variable names mapping
+    allnames <- generate_variable_names()
+    
+    ## Extract available columns and match with expected names
+    namesOfInterest <- allnames$fit_names
+    namesToBeUsed <- allnames$human_names
+    inds <- match(namesOfInterest, names(records), nomatch = 0)
+    
+    ## Create observations data frame with available columns
+    observations <- as.data.frame(records[namesOfInterest[inds != 0]])
+    names(observations) <- namesToBeUsed[inds != 0]
 
     ## Convert timestamps to POSIXct
     observations$time <- as.POSIXct(observations$time, tz = timezone)
-
+    
     ## Guess sport from data if not provided
     if (is.null(sport)) {
         session_data <- FITfileR::getMessagesByType(fit_data, message_type = "session")
@@ -942,7 +940,6 @@ readFIT <- function(file,
     }
 
     ## Add missing variables to match trackeRdata format
-    allnames <- generate_variable_names()
     missingVars <- allnames$human_names[match(allnames$human_names, names(observations), nomatch = 0) == 0]
     if (nrow(observations) > 0) {
         for (nn in missingVars) {
